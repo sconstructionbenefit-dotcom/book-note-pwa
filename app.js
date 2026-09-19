@@ -157,39 +157,61 @@ class GeminiService {
     return Boolean(this.apiKey && this.apiKey.trim().length > 10);
   }
 
-  async callGemini(prompt, images = []) {
+  async callGemini(prompt, images = [], isJson = false) {
     if (!this.hasApiKey()) {
-      throw new Error('Gemini APIキーが設定されていません。右上の設定画面からAPIキーを入力してください。');
+      throw new Error('Gemini APIキーが設定されていません。画面右上の⚙️設定から無料のAPIキーを入力してください。');
     }
 
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey.trim()}`;
 
     const parts = [];
 
-    // Add Images if provided
+    // Add Images if provided (support both inline_data and direct properties)
     for (const img of images) {
-      // img = { inlineData: { data: base64Str, mimeType: "image/jpeg" } }
-      parts.push(img);
+      const data = img.inline_data?.data || img.inlineData?.data || img.base64 || img.data;
+      const mimeType = img.inline_data?.mime_type || img.inlineData?.mimeType || img.mimeType || 'image/jpeg';
+      if (data) {
+        parts.push({
+          inline_data: {
+            mime_type: mimeType,
+            data: data
+          }
+        });
+      }
     }
 
     // Add Prompt text
     parts.push({ text: prompt });
+
+    const genConfig = {
+      temperature: 0.2,
+      maxOutputTokens: 2048,
+    };
+    if (isJson) {
+      genConfig.responseMimeType = "application/json";
+    }
 
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts }],
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 2048,
-        }
+        generationConfig: genConfig
       })
     });
 
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(`Gemini API エラー (${response.status}): ${errText}`);
+      let msg = `Gemini API エラー (${response.status})`;
+      try {
+        const errObj = JSON.parse(errText);
+        if (errObj.error?.message) {
+          msg += `: ${errObj.error.message}`;
+        }
+      } catch (e) {
+        msg += `: ${errText.slice(0, 100)}`;
+      }
+      throw new Error(msg);
     }
 
     const data = await response.json();
@@ -202,28 +224,39 @@ class GeminiService {
   async extractBookMetadata(images = []) {
     const prompt = `
 あなたは書籍の書誌情報および装丁テキストを正確に解析するプロフェッショナルです。
-提供された画像（表紙、裏表紙、背後、帯、奥付など）を読み取り、書籍に関する以下の情報を正確に抽出してください。
-Markdown記法や説明文、コードブロックバッククォート（\`\`\`json等）は一切含めず、純粋なJSONオブジェクトのみを返してください。
+提供された画像（表紙、裏表紙、背後、帯、奥付など）を読み取り、書籍に関する以下の情報を正確に抽出して純粋なJSONオブジェクトのみを出力してください。
+説明文や前置き、Markdownのコードブロックは含めないでください。
 
-【抽出項目とJSONフォーマット】
+【出力フォーマット】
 {
   "title": "書籍タイトル（サブタイトルがある場合は『メインタイトル：サブタイトル』形式）",
   "author": "著者名（編著者、訳者、監修等を含む）",
-  "publishedDate": "出版年月（例: 2024年3月、2023年等。奥付や発行日、著作権表記から推測可能な年月）",
-  "publisher": "出版社名（例: 日経BP、ダイヤモンド社、学芸出版社等）",
-  "theme": "書籍のテーマ・ジャンル（例: 建築・施工管理、不動産投資、資産運用、子育て・仕事術、思考法など適切なものを1つ）",
+  "publishedDate": "出版年月（例: 2024年3月、2023年等。奥付や発行日、著作権表記から判別）",
+  "publisher": "出版社名（例: 技報堂出版、日経BP、学芸出版社等）",
+  "theme": "書籍のテーマ・ジャンル（例: 建築・施工管理、不動産投資、資産運用、子育て・仕事術、思考法など適切なもの1つ）",
   "description": "裏表紙や帯、カバー袖に記載された本の内容紹介、キャッチコピー、あらすじ、推薦文などの要約テキスト（2〜4文程度）"
 }
 
 【補足指示】
-- 写真が不鮮明で読み取れない項目がある場合は空文字 "" にしてください。
-- タイトルや著者名は、装丁上の強調度や文字サイズから正確に判別してください。
-- 帯の文句よりも、書籍自体の正式なタイトル・著者を優先してください。
+- 写真が1枚だけ（表紙のみ、または奥付のみ）の場合でも、読み取れる項目を最大限正確に抽出してください。
+- 読み取れない項目は空文字 "" にしてください。
+- 帯のキャッチコピーよりも、書籍自体の正式なタイトル・著者を優先してください。
 `;
 
-    const resultText = await this.callGemini(prompt, images);
-    const cleaned = resultText.replace(/```json/gi, '').replace(/```/g, '').trim();
-    return JSON.parse(cleaned);
+    const resultText = await this.callGemini(prompt, images, true);
+    
+    // Robust JSON extraction
+    try {
+      return JSON.parse(resultText.trim());
+    } catch (e) {
+      const cleaned = resultText.replace(/^```[a-z]*\n?/gim, '').replace(/```$/gm, '').trim();
+      const firstBrace = cleaned.indexOf('{');
+      const lastBrace = cleaned.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace !== -1) {
+        return JSON.parse(cleaned.substring(firstBrace, lastBrace + 1));
+      }
+      throw new Error('AIが返した書籍情報のJSONパースに失敗しました。');
+    }
   }
 
   /**
@@ -620,15 +653,15 @@ class AppController {
     this.ui.btnDeleteBook.addEventListener('click', () => this.handleDeleteBook());
 
     // Cover & Back Photo Capture Handlers
-    this.ui.btnSnapCoverFront.addEventListener('click', () => this.ui.fileCoverFront.click());
-    this.ui.btnSnapCoverBack.addEventListener('click', () => this.ui.fileCoverBack.click());
     this.ui.fileCoverFront.addEventListener('change', (e) => this.handleCoverPhotoUpload(e, 'front'));
     this.ui.fileCoverBack.addEventListener('change', (e) => this.handleCoverPhotoUpload(e, 'back'));
     this.ui.btnRemoveCoverFront.addEventListener('click', (e) => {
+      e.preventDefault();
       e.stopPropagation();
       this.removeCoverPhoto('front');
     });
     this.ui.btnRemoveCoverBack.addEventListener('click', (e) => {
+      e.preventDefault();
       e.stopPropagation();
       this.removeCoverPhoto('back');
     });
@@ -913,33 +946,74 @@ class AppController {
     this.openModal('modalBookEdit');
   }
 
+  async resizeAndConvertToBase64(file, maxWidth = 1200) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            let w = img.width;
+            let h = img.height;
+            if (w > maxWidth) {
+              h = Math.round((h * maxWidth) / w);
+              w = maxWidth;
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            resolve(dataUrl);
+          } catch (err) {
+            reject(err);
+          }
+        };
+        img.onerror = () => reject(new Error('画像の展開に失敗しました。'));
+        img.src = e.target.result;
+      };
+      reader.onerror = () => reject(new Error('写真ファイルの読み込みに失敗しました。'));
+      reader.readAsDataURL(file);
+    });
+  }
+
   async handleCoverPhotoUpload(event, type) {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const base64DataUrl = await this.resizeAndConvertToBase64(file, 1200);
-    const item = {
-      dataUrl: base64DataUrl,
-      base64: base64DataUrl.split(',')[1],
-      mimeType: file.type || 'image/jpeg'
-    };
+    try {
+      this.showToast('写真を処理中...');
+      const base64DataUrl = await this.resizeAndConvertToBase64(file, 1200);
+      const item = {
+        dataUrl: base64DataUrl,
+        base64: base64DataUrl.split(',')[1],
+        mimeType: 'image/jpeg'
+      };
 
-    if (type === 'front') {
-      this.pendingCoverFront = item;
-      this.ui.imgPreviewFront.src = base64DataUrl;
-      this.ui.imgPreviewFront.classList.remove('hidden');
-      this.ui.btnRemoveCoverFront.classList.remove('hidden');
-      this.ui.slotCoverFront.querySelector('.photo-placeholder').classList.add('hidden');
-    } else {
-      this.pendingCoverBack = item;
-      this.ui.imgPreviewBack.src = base64DataUrl;
-      this.ui.imgPreviewBack.classList.remove('hidden');
-      this.ui.btnRemoveCoverBack.classList.remove('hidden');
-      this.ui.slotCoverBack.querySelector('.photo-placeholder').classList.add('hidden');
+      if (type === 'front') {
+        this.pendingCoverFront = item;
+        this.ui.imgPreviewFront.src = base64DataUrl;
+        this.ui.imgPreviewFront.classList.remove('hidden');
+        this.ui.btnRemoveCoverFront.classList.remove('hidden');
+        this.ui.slotCoverFront.querySelector('.photo-placeholder').classList.add('hidden');
+      } else {
+        this.pendingCoverBack = item;
+        this.ui.imgPreviewBack.src = base64DataUrl;
+        this.ui.imgPreviewBack.classList.remove('hidden');
+        this.ui.btnRemoveCoverBack.classList.remove('hidden');
+        this.ui.slotCoverBack.querySelector('.photo-placeholder').classList.add('hidden');
+      }
+
+      // Enable AI extraction button if at least one photo is present
+      this.ui.btnExtractBookAI.disabled = false;
+      this.showToast(type === 'front' ? '📘 表紙を取り込みました' : '📄 奥付を取り込みました');
+    } catch (err) {
+      console.error(err);
+      alert('写真の処理中にエラーが発生しました: ' + err.message);
+    } finally {
+      event.target.value = ''; // Reset input to allow re-uploading same file
     }
-
-    this.ui.btnExtractBookAI.disabled = false;
-    event.target.value = ''; // Reset input to allow re-upload
   }
 
   removeCoverPhoto(type) {
@@ -966,27 +1040,25 @@ class AppController {
     const imagesToProcess = [];
     if (this.pendingCoverFront && this.pendingCoverFront.base64) {
       imagesToProcess.push({
-        inlineData: {
-          data: this.pendingCoverFront.base64,
-          mimeType: this.pendingCoverFront.mimeType
-        }
+        base64: this.pendingCoverFront.base64,
+        mimeType: 'image/jpeg'
       });
     }
     if (this.pendingCoverBack && this.pendingCoverBack.base64) {
       imagesToProcess.push({
-        inlineData: {
-          data: this.pendingCoverBack.base64,
-          mimeType: this.pendingCoverBack.mimeType
-        }
+        base64: this.pendingCoverBack.base64,
+        mimeType: 'image/jpeg'
       });
     }
 
     if (imagesToProcess.length === 0) {
-      alert('解析する表紙または背後の写真を撮影・選択してください');
+      alert('表紙または奥付の写真を1枚以上撮影・選択してください');
       return;
     }
 
-    this.ui.btnExtractBookAI.disabled = true;
+    const btn = this.ui.btnExtractBookAI;
+    btn.disabled = true;
+    btn.textContent = '⏳ AIで書籍情報を解析中...';
     this.ui.bookExtractLoading.classList.remove('hidden');
 
     try {
@@ -1003,7 +1075,7 @@ class AppController {
           theme: "建築・施工管理",
           description: "現場で磨かれた観察眼と積算力を武器に、書籍から本質的な知識を抽出し、note記事として爆速アウトプットするための実践的ガイドブック。"
         };
-        this.showToast('APIキー未設定のため、サンプル抽出データを転記しました');
+        this.showToast('⚠️ APIキー未設定のため、サンプル抽出データを転記しました（右上の⚙️から無料キーを設定してください）');
       }
 
       if (meta) {
@@ -1014,13 +1086,14 @@ class AppController {
         if (meta.theme) this.ui.inputBookTheme.value = meta.theme;
         if (meta.description) this.ui.inputBookDescription.value = meta.description;
 
-        this.showToast('✨ 表紙・背後から書籍情報を自動転記しました！');
+        this.showToast('✨ 表紙・奥付から書籍情報を自動転記しました！');
       }
     } catch (err) {
       console.error(err);
       alert('書籍情報の抽出に失敗しました: ' + err.message);
     } finally {
-      this.ui.btnExtractBookAI.disabled = false;
+      btn.disabled = false;
+      btn.textContent = '✨ AIで表紙・奥付から書籍情報を自動読取';
       this.ui.bookExtractLoading.classList.add('hidden');
     }
   }

@@ -392,50 +392,50 @@
           <!-- Photo Auto-Extraction Section -->
           <div class="camera-auto-box">
             <div class="camera-box-header">
-              <span class="box-title">📷 表紙・背後（裏表紙）撮影で自動転記</span>
-              <span class="box-sub">タイトル・著者・出版年月・あらすじを自動読取</span>
+              <span class="box-title">📷 表紙・奥付の撮影で書籍情報を自動読取</span>
+              <span class="box-sub">どちらか1枚だけでも、2枚ともでもAI解析可能です</span>
             </div>
 
             <div class="book-camera-dual-grid">
-              <!-- Front Cover Card -->
+              <!-- Front Cover Card (Clickable Label) -->
               <div class="photo-capture-card" id="card-cover-photo">
                 <div class="photo-label">① 本の表紙（表）</div>
-                <div class="photo-preview-slot" id="slot-cover-front">
+                <label for="file-cover-front" class="photo-preview-slot" id="slot-cover-front" title="タップして表紙を撮影または選択">
                   <div class="photo-placeholder">
                     <span class="icon">📘</span>
-                    <span class="text">表紙を撮影</span>
+                    <span class="text">タップして撮影 / 選択</span>
                   </div>
                   <img id="img-preview-front" src="" alt="表紙プレビュー" class="preview-img hidden">
-                  <button id="btn-remove-cover-front" class="photo-remove-btn hidden" title="写真を削除">&times;</button>
-                </div>
-                <button type="button" id="btn-snap-cover-front" class="action-btn-small secondary">
+                  <button type="button" id="btn-remove-cover-front" class="photo-remove-btn hidden" title="写真を削除">&times;</button>
+                </label>
+                <label for="file-cover-front" class="action-btn-small secondary card-trigger-btn">
                   📷 表紙を撮影 / 選択
-                </button>
-                <input type="file" id="file-cover-front" accept="image/*" capture="environment" class="file-input-hidden">
+                </label>
+                <input type="file" id="file-cover-front" accept="image/*" class="file-input-accessible">
               </div>
 
-              <!-- Back Cover / Description Card -->
+              <!-- Back Cover / Description Card (Clickable Label) -->
               <div class="photo-capture-card" id="card-back-photo">
-                <div class="photo-label">② 背後の説明文・奥付（裏）</div>
-                <div class="photo-preview-slot" id="slot-cover-back">
+                <div class="photo-label">② 背後説明・奥付（裏）</div>
+                <label for="file-cover-back" class="photo-preview-slot" id="slot-cover-back" title="タップして奥付・裏表紙を撮影または選択">
                   <div class="photo-placeholder">
                     <span class="icon">📄</span>
-                    <span class="text">裏表紙・奥付を撮影</span>
+                    <span class="text">タップして撮影 / 選択</span>
                   </div>
                   <img id="img-preview-back" src="" alt="背後プレビュー" class="preview-img hidden">
-                  <button id="btn-remove-cover-back" class="photo-remove-btn hidden" title="写真を削除">&times;</button>
-                </div>
-                <button type="button" id="btn-snap-cover-back" class="action-btn-small secondary">
-                  📷 背後を撮影 / 選択
-                </button>
-                <input type="file" id="file-cover-back" accept="image/*" capture="environment" class="file-input-hidden">
+                  <button type="button" id="btn-remove-cover-back" class="photo-remove-btn hidden" title="写真を削除">&times;</button>
+                </label>
+                <label for="file-cover-back" class="action-btn-small secondary card-trigger-btn">
+                  📷 奥付を撮影 / 選択
+                </label>
+                <input type="file" id="file-cover-back" accept="image/*" class="file-input-accessible">
               </div>
             </div>
 
             <!-- OCR Auto Extraction Action Button -->
             <div class="auto-extract-footer">
               <button type="button" id="btn-extract-book-ai" class="action-btn gradient-accent full-width" disabled>
-                ✨ AIで表紙・背後から書籍情報を自動読取
+                ✨ AIで表紙・奥付から書籍情報を自動読取
               </button>
               <div id="book-extract-loading" class="ai-processing-indicator hidden">
                 <span class="spinner-dot"></span>
