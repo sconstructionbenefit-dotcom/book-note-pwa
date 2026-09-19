@@ -320,21 +320,32 @@
               <span class="step-hint">改ページ順に並べてください</span>
             </div>
             <div class="toc-step-buttons">
-              <button id="btn-add-toc-page" class="action-btn-small gradient-accent" title="ページを追加">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                <span>＋ ページを追加</span>
+              <button type="button" id="btn-add-toc-cam" class="action-btn-small gradient-accent" title="カメラで目次を撮影して追加">
+                📷 撮影追加
               </button>
-              <button id="btn-clear-toc-pages" class="action-btn-small secondary hidden" title="全クリア">クリア</button>
-              <input type="file" id="file-toc-input" accept="image/*" multiple style="display: none;" aria-hidden="true">
+              <button type="button" id="btn-add-toc-lib" class="action-btn-small secondary" title="ライブラリから目次写真を選択して追加">
+                🖼️ 写真選択
+              </button>
+              <button type="button" id="btn-clear-toc-pages" class="action-btn-small secondary hidden" title="全クリア">クリア</button>
+              <input type="file" id="file-toc-cam" accept="image/*" capture="environment" style="display: none;" aria-hidden="true">
+              <input type="file" id="file-toc-lib" accept="image/*" multiple style="display: none;" aria-hidden="true">
             </div>
           </div>
 
           <!-- Empty State Dropzone -->
           <div id="dropzone-toc" class="upload-dropzone">
             <div class="dropzone-content">
-              <div class="dropzone-icon">📸</div>
-              <p class="dropzone-main">ここをタップして目次ページを撮影または選択</p>
-              <p class="dropzone-sub">※複数ページある場合は「＋ ページを追加」で何枚でも追加できます</p>
+              <div class="dropzone-icon">📖</div>
+              <p class="dropzone-main">目次ページを取り込む</p>
+              <p class="dropzone-sub">本の目次をカメラで直接撮影するか、ライブラリから選択できます（複数ページ対応）</p>
+              <div class="dropzone-actions-row">
+                <button type="button" id="btn-dropzone-cam" class="action-btn gradient-accent dropzone-choice-btn">
+                  📷 カメラで撮影
+                </button>
+                <button type="button" id="btn-dropzone-lib" class="action-btn secondary dropzone-choice-btn">
+                  🖼️ ライブラリから選択
+                </button>
+              </div>
             </div>
           </div>
 
@@ -397,38 +408,50 @@
             </div>
 
             <div class="book-camera-dual-grid">
-              <!-- Front Cover Card (Clickable Label) -->
+              <!-- Front Cover Card -->
               <div class="photo-capture-card" id="card-cover-photo">
                 <div class="photo-label">① 本の表紙（表）</div>
-                <label for="file-cover-front" class="photo-preview-slot" id="slot-cover-front" title="タップして表紙を撮影または選択">
-                  <div class="photo-placeholder">
+                <div class="photo-preview-slot" id="slot-cover-front" title="表紙写真">
+                  <div class="photo-placeholder" id="placeholder-cover-front">
                     <span class="icon">📘</span>
-                    <span class="text">タップして撮影 / 選択</span>
+                    <span class="text">未登録</span>
                   </div>
                   <img id="img-preview-front" src="" alt="表紙プレビュー" class="preview-img hidden">
                   <button type="button" id="btn-remove-cover-front" class="photo-remove-btn hidden" title="写真を削除">&times;</button>
-                </label>
-                <label for="file-cover-front" class="action-btn-small secondary card-trigger-btn">
-                  📷 表紙を撮影 / 選択
-                </label>
-                <input type="file" id="file-cover-front" accept="image/*" class="file-input-accessible">
+                </div>
+                <div class="photo-action-buttons">
+                  <button type="button" id="btn-front-camera" class="action-btn-small gradient-accent photo-btn-item" title="カメラで表紙を撮影">
+                    📷 撮影
+                  </button>
+                  <button type="button" id="btn-front-library" class="action-btn-small secondary photo-btn-item" title="ライブラリから表紙写真を選択">
+                    🖼️ 選択
+                  </button>
+                </div>
+                <input type="file" id="file-cover-front-cam" accept="image/*" capture="environment" style="display: none;" aria-hidden="true">
+                <input type="file" id="file-cover-front-lib" accept="image/*" style="display: none;" aria-hidden="true">
               </div>
 
-              <!-- Back Cover / Description Card (Clickable Label) -->
+              <!-- Back Cover / Description Card -->
               <div class="photo-capture-card" id="card-back-photo">
                 <div class="photo-label">② 背後説明・奥付（裏）</div>
-                <label for="file-cover-back" class="photo-preview-slot" id="slot-cover-back" title="タップして奥付・裏表紙を撮影または選択">
-                  <div class="photo-placeholder">
+                <div class="photo-preview-slot" id="slot-cover-back" title="奥付・裏表紙写真">
+                  <div class="photo-placeholder" id="placeholder-cover-back">
                     <span class="icon">📄</span>
-                    <span class="text">タップして撮影 / 選択</span>
+                    <span class="text">未登録</span>
                   </div>
                   <img id="img-preview-back" src="" alt="背後プレビュー" class="preview-img hidden">
                   <button type="button" id="btn-remove-cover-back" class="photo-remove-btn hidden" title="写真を削除">&times;</button>
-                </label>
-                <label for="file-cover-back" class="action-btn-small secondary card-trigger-btn">
-                  📷 奥付を撮影 / 選択
-                </label>
-                <input type="file" id="file-cover-back" accept="image/*" class="file-input-accessible">
+                </div>
+                <div class="photo-action-buttons">
+                  <button type="button" id="btn-back-camera" class="action-btn-small gradient-accent photo-btn-item" title="カメラで奥付を撮影">
+                    📷 撮影
+                  </button>
+                  <button type="button" id="btn-back-library" class="action-btn-small secondary photo-btn-item" title="ライブラリから奥付写真を選択">
+                    🖼️ 選択
+                  </button>
+                </div>
+                <input type="file" id="file-cover-back-cam" accept="image/*" capture="environment" style="display: none;" aria-hidden="true">
+                <input type="file" id="file-cover-back-lib" accept="image/*" style="display: none;" aria-hidden="true">
               </div>
             </div>
 
@@ -510,9 +533,9 @@
           <div class="form-group mt-16">
             <label for="select-gemini-model">使用AIモデル</label>
             <select id="select-gemini-model" class="form-select">
-              <option value="gemini-2.0-flash">gemini-2.0-flash (最新・超高速・推奨)</option>
-              <option value="gemini-1.5-flash">gemini-1.5-flash (安定・高速)</option>
-              <option value="gemini-1.5-pro">gemini-1.5-pro (高精度・深層分析)</option>
+              <option value="gemini-3.8-flash">gemini-3.8-flash (最新・超高速・推奨)</option>
+              <option value="gemini-3.6-flash">gemini-3.6-flash (高速・安定)</option>
+              <option value="gemini-3.6-pro">gemini-3.6-pro (高精度・深層分析)</option>
             </select>
           </div>
 

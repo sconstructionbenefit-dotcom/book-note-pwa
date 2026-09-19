@@ -140,7 +140,7 @@ class BookNoteDB {
 // 2. Gemini API Service
 // ==========================================================================
 class GeminiService {
-  constructor(apiKey = '', model = 'gemini-2.0-flash') {
+  constructor(apiKey = '', model = 'gemini-3.8-flash') {
     this.apiKey = apiKey;
     this.model = model;
   }
@@ -567,9 +567,13 @@ class AppController {
       // TOC Import Modal (Multi-Page Upgraded)
       modalTOCImport: document.getElementById('modal-toc-import'),
       btnCloseTOCModal: document.getElementById('btn-close-toc-modal'),
-      fileTOCInput: document.getElementById('file-toc-input'),
+      fileTOCCam: document.getElementById('file-toc-cam'),
+      fileTOCLib: document.getElementById('file-toc-lib'),
       dropzoneTOC: document.getElementById('dropzone-toc'),
-      btnAddTOCPage: document.getElementById('btn-add-toc-page'),
+      btnDropzoneCam: document.getElementById('btn-dropzone-cam'),
+      btnDropzoneLib: document.getElementById('btn-dropzone-lib'),
+      btnAddTOCCam: document.getElementById('btn-add-toc-cam'),
+      btnAddTOCLib: document.getElementById('btn-add-toc-lib'),
       btnClearTOCPages: document.getElementById('btn-clear-toc-pages'),
       tocPageBadge: document.getElementById('toc-page-badge'),
       tocPageListContainer: document.getElementById('toc-page-list-container'),
@@ -582,14 +586,18 @@ class AppController {
       btnParseTOCAI: document.getElementById('btn-parse-toc-ai'),
       btnConfirmTOC: document.getElementById('btn-confirm-toc'),
 
-      // Book Edit Modal (Cover & Back Extraction Upgraded)
+      // Book Edit Modal (Cover & Back Dual Camera/Library Upgraded)
       modalBookEdit: document.getElementById('modal-book-edit'),
       bookModalTitle: document.getElementById('book-modal-title'),
       btnCloseBookModal: document.getElementById('btn-close-book-modal'),
-      btnSnapCoverFront: document.getElementById('btn-snap-cover-front'),
-      btnSnapCoverBack: document.getElementById('btn-snap-cover-back'),
-      fileCoverFront: document.getElementById('file-cover-front'),
-      fileCoverBack: document.getElementById('file-cover-back'),
+      btnFrontCamera: document.getElementById('btn-front-camera'),
+      btnFrontLibrary: document.getElementById('btn-front-library'),
+      fileCoverFrontCam: document.getElementById('file-cover-front-cam'),
+      fileCoverFrontLib: document.getElementById('file-cover-front-lib'),
+      btnBackCamera: document.getElementById('btn-back-camera'),
+      btnBackLibrary: document.getElementById('btn-back-library'),
+      fileCoverBackCam: document.getElementById('file-cover-back-cam'),
+      fileCoverBackLib: document.getElementById('file-cover-back-lib'),
       slotCoverFront: document.getElementById('slot-cover-front'),
       slotCoverBack: document.getElementById('slot-cover-back'),
       imgPreviewFront: document.getElementById('img-preview-front'),
@@ -654,9 +662,50 @@ class AppController {
     this.ui.btnSaveBook.addEventListener('click', () => this.handleSaveBook());
     this.ui.btnDeleteBook.addEventListener('click', () => this.handleDeleteBook());
 
-    // Cover & Back Photo Capture Handlers
-    this.ui.fileCoverFront.addEventListener('change', (e) => this.handleCoverPhotoUpload(e, 'front'));
-    this.ui.fileCoverBack.addEventListener('change', (e) => this.handleCoverPhotoUpload(e, 'back'));
+    // Front Cover Camera & Library Handlers
+    if (this.ui.btnFrontCamera) {
+      this.ui.btnFrontCamera.addEventListener('click', () => this.ui.fileCoverFrontCam.click());
+    }
+    if (this.ui.btnFrontLibrary) {
+      this.ui.btnFrontLibrary.addEventListener('click', () => this.ui.fileCoverFrontLib.click());
+    }
+    if (this.ui.slotCoverFront) {
+      this.ui.slotCoverFront.addEventListener('click', (e) => {
+        if (e.target.closest('#btn-remove-cover-front')) return;
+        if (!this.pendingCoverFront) {
+          this.ui.fileCoverFrontCam.click();
+        }
+      });
+    }
+    if (this.ui.fileCoverFrontCam) {
+      this.ui.fileCoverFrontCam.addEventListener('change', (e) => this.handleCoverPhotoUpload(e, 'front'));
+    }
+    if (this.ui.fileCoverFrontLib) {
+      this.ui.fileCoverFrontLib.addEventListener('change', (e) => this.handleCoverPhotoUpload(e, 'front'));
+    }
+
+    // Back Cover Camera & Library Handlers
+    if (this.ui.btnBackCamera) {
+      this.ui.btnBackCamera.addEventListener('click', () => this.ui.fileCoverBackCam.click());
+    }
+    if (this.ui.btnBackLibrary) {
+      this.ui.btnBackLibrary.addEventListener('click', () => this.ui.fileCoverBackLib.click());
+    }
+    if (this.ui.slotCoverBack) {
+      this.ui.slotCoverBack.addEventListener('click', (e) => {
+        if (e.target.closest('#btn-remove-cover-back')) return;
+        if (!this.pendingCoverBack) {
+          this.ui.fileCoverBackCam.click();
+        }
+      });
+    }
+    if (this.ui.fileCoverBackCam) {
+      this.ui.fileCoverBackCam.addEventListener('change', (e) => this.handleCoverPhotoUpload(e, 'back'));
+    }
+    if (this.ui.fileCoverBackLib) {
+      this.ui.fileCoverBackLib.addEventListener('change', (e) => this.handleCoverPhotoUpload(e, 'back'));
+    }
+
     this.ui.btnRemoveCoverFront.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -714,11 +763,26 @@ class AppController {
     this.ui.btnEmptyImportTOC.addEventListener('click', () => this.openTOCImportModal());
     this.ui.btnCloseTOCModal.addEventListener('click', () => this.closeModal('modalTOCImport'));
     
-    // Multi-Page TOC Upload & Actions
-    this.ui.dropzoneTOC.addEventListener('click', () => this.ui.fileTOCInput.click());
-    this.ui.btnAddTOCPage.addEventListener('click', () => this.ui.fileTOCInput.click());
+    // Multi-Page TOC Upload & Actions (Dual Camera / Library)
+    if (this.ui.btnDropzoneCam) {
+      this.ui.btnDropzoneCam.addEventListener('click', () => this.ui.fileTOCCam.click());
+    }
+    if (this.ui.btnDropzoneLib) {
+      this.ui.btnDropzoneLib.addEventListener('click', () => this.ui.fileTOCLib.click());
+    }
+    if (this.ui.btnAddTOCCam) {
+      this.ui.btnAddTOCCam.addEventListener('click', () => this.ui.fileTOCCam.click());
+    }
+    if (this.ui.btnAddTOCLib) {
+      this.ui.btnAddTOCLib.addEventListener('click', () => this.ui.fileTOCLib.click());
+    }
+    if (this.ui.fileTOCCam) {
+      this.ui.fileTOCCam.addEventListener('change', (e) => this.handleTOCImageUpload(e));
+    }
+    if (this.ui.fileTOCLib) {
+      this.ui.fileTOCLib.addEventListener('change', (e) => this.handleTOCImageUpload(e));
+    }
     this.ui.btnClearTOCPages.addEventListener('click', () => this.clearTOCPages());
-    this.ui.fileTOCInput.addEventListener('change', (e) => this.handleTOCImageUpload(e));
     this.ui.btnParseTOCAI.addEventListener('click', () => this.handleParseTOC());
     this.ui.btnConfirmTOC.addEventListener('click', () => this.handleConfirmTOC());
 
@@ -800,7 +864,11 @@ class AppController {
   // ========================================================================
   async loadSettings() {
     const apiKey = await this.db.getSetting('gemini_api_key', '');
-    const model = await this.db.getSetting('gemini_model', 'gemini-2.0-flash');
+    let model = await this.db.getSetting('gemini_model', 'gemini-3.8-flash');
+    if (!model || model.includes('gemini-2') || model.includes('gemini-1')) {
+      model = 'gemini-3.8-flash';
+      await this.db.saveSetting('gemini_model', model);
+    }
     this.gemini.setApiKey(apiKey);
     this.gemini.setModel(model);
 
