@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>読書ノート to note | アイデア集積PWA</title>
+  <meta name="description" content="紙の本の目次から音声・テキストで知識とアイデアを蓄積し、note記事を爆速で企画・生成する専用PWA">
+  
+  <!-- PWA Meta Tags -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="読書note">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-theme">
+  <!-- App Container -->
+  <div id="app" class="app-container">
+    
+    <!-- Top App Bar -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="brand-logo">
+          <svg viewBox="0 0 512 512" width="28" height="28">
+            <use href="icons/icon.svg#bgGrad"></use>
+            <circle cx="256" cy="256" r="230" fill="#1e293b" stroke="#38bdf8" stroke-width="20"/>
+            <path d="M 160 320 C 220 295, 290 305, 320 325 L 320 185 C 290 165, 220 155, 160 180 Z" fill="#38bdf8" opacity="0.8"/>
+            <path d="M 160 320 C 100 295, 30 305, 0 325 L 0 185 C 30 165, 100 155, 160 180 Z" fill="#818cf8" opacity="0.8"/>
+            <circle cx="256" cy="140" r="45" fill="#f59e0b"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">読書ノート <span class="brand-sub">to note</span></span>
+        </div>
+      </div>
+      
+      <div class="header-actions">
+        <button id="btn-quick-voice" class="icon-btn voice-pulse-btn" title="クイック音声メモ">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+            <line x1="12" y1="19" x2="12" y2="22"></line>
+          </svg>
+        </button>
+        <button id="btn-add-book" class="icon-btn" title="新しい書籍を追加">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </button>
+        <button id="btn-settings" class="icon-btn" title="設定">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Book Selector Strip -->
+    <div class="book-selector-bar">
+      <div class="book-select-wrapper">
+        <label for="current-book-select" class="sr-only">選択中の書籍</label>
+        <span class="book-icon-prefix">📖</span>
+        <select id="current-book-select" class="book-select-dropdown"></select>
+      </div>
+      <button id="btn-edit-book" class="pill-btn-small" title="書籍情報の編集">編集</button>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="main-viewport">
+      
+      <!-- TAB 1: 目次・読書ツリー画面 -->
+      <section id="view-tree" class="app-view active">
+        <!-- Book Hero Card -->
+        <div id="book-hero" class="book-hero-card">
+          <div class="book-hero-main">
+            <div class="book-cover-badge" id="hero-cover-badge">
+              <span id="hero-cover-text">本</span>
+              <img id="hero-cover-img" src="" alt="表紙" class="hero-cover-img hidden">
+            </div>
+            <div class="book-hero-info">
+              <div class="book-meta-top">
+                <span id="hero-theme-badge" class="meta-pill hidden">テーマ</span>
+                <span id="hero-publisher-badge" class="meta-pill hidden">出版社</span>
+                <span id="hero-published-badge" class="meta-pill hidden">出版年月</span>
+              </div>
+              <h1 id="hero-title" class="book-title">書籍を選択してください</h1>
+              <p id="hero-author" class="book-author">著者名</p>
+              <div class="book-stats">
+                <span class="stat-badge"><strong id="hero-memo-count">0</strong> 件のメモ</span>
+                <span class="stat-badge"><strong id="hero-chapter-count">0</strong> 章</span>
+              </div>
+            </div>
+          </div>
+          <!-- Expandable book description if available -->
+          <div id="hero-desc-container" class="book-desc-box hidden">
+            <div class="book-desc-header">
+              <span class="desc-label">📝 背後説明・あらすじ</span>
+              <button id="btn-toggle-hero-desc" class="mini-text-btn">表示</button>
+            </div>
+            <p id="hero-desc-text" class="book-desc-content hidden"></p>
+          </div>
+          <div class="book-hero-actions">
+            <button id="btn-import-toc" class="action-btn secondary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              目次を撮影・取込
+            </button>
+            <button id="btn-hero-generate-note" class="action-btn gradient-accent">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+              note記事を企画
+            </button>
+          </div>
+        </div>
+
+        <!-- TOC Tree Section -->
+        <div class="section-container">
+          <div class="section-header">
+            <h2 class="section-title">目次とメモのツリー</h2>
+            <div class="tree-controls">
+              <button id="btn-expand-all" class="text-link-btn">すべて開く</button>
+              <span class="divider">/</span>
+              <button id="btn-collapse-all" class="text-link-btn">閉じる</button>
+            </div>
+          </div>
+
+          <!-- Empty State for TOC -->
+          <div id="toc-empty-state" class="empty-state-box hidden">
+            <div class="empty-icon">📷</div>
+            <h3>目次がまだ登録されていません</h3>
+            <p>スマホで紙の本の目次ページを撮影するだけで、AIが自動的に章・節ツリーを作成します。</p>
+            <button id="btn-empty-import-toc" class="action-btn primary mt-12">目次写真をアップロード</button>
+          </div>
+
+          <!-- Dynamic TOC Tree Container -->
+          <div id="toc-tree-container" class="toc-tree-list"></div>
+        </div>
+      </section>
+
+      <!-- TAB 2: 蓄積メモ一覧 (Feed View) -->
+      <section id="view-memos" class="app-view">
+        <div class="section-container">
+          <div class="section-header">
+            <h2 class="section-title">蓄積アイデア・メモ一覧</h2>
+            <div class="memo-filter-chips">
+              <button class="chip-btn active" data-filter="all">すべて</button>
+              <button class="chip-btn" data-filter="note-idea">💡 noteネタ</button>
+              <button class="chip-btn" data-filter="starred">★ お気に入り</button>
+            </div>
+          </div>
+
+          <!-- Memo Feed Container -->
+          <div id="memo-feed-container" class="memo-feed-list"></div>
+        </div>
+      </section>
+
+      <!-- TAB 3: note記事企画スタジオ (Note Studio) -->
+      <section id="view-studio" class="app-view">
+        <div class="section-container">
+          <div class="studio-intro-card">
+            <div class="studio-header">
+              <div class="studio-badge">雪国アーキパパ × note</div>
+              <h2 class="section-title">note記事 企画・構成案スタジオ</h2>
+              <p class="studio-desc">読書で集めた知識・気づきから、一級建築士・現場経験・不動産目線を活かした独自のnote記事構成案を一気に生成します。</p>
+            </div>
+
+            <div class="studio-form-grid">
+              <div class="form-group">
+                <label for="studio-target-scope">企画の対象範囲</label>
+                <select id="studio-target-scope" class="form-select">
+                  <option value="book-all">書籍全体のメモから総力特集</option>
+                  <option value="selected-chapter">特定の章・テーマを深掘り</option>
+                </select>
+              </div>
+
+              <div class="form-group" id="studio-chapter-select-group" style="display: none;">
+                <label for="studio-chapter-select">対象の章を選択</label>
+                <select id="studio-chapter-select" class="form-select"></select>
+              </div>
+
+              <div class="form-group">
+                <label for="studio-tone-select">記事の切り口・トーン</label>
+                <select id="studio-tone-select" class="form-select">
+                  <option value="practical">【実務・現場のリアル】準大手ゼネコン・建設コンサル目線の本音（推奨）</option>
+                  <option value="family-remote">【育休・完全リモート】子育てパパの生活・タイムマネジメント・思考</option>
+                  <option value="realestate-invest">【不動産投資・融資】地方築古アパート・戸建再生のリアル考察</option>
+                  <option value="book-review">【専門書レビュー】一級建築士が唸った実践的学びと読書術</option>
+                </select>
+              </div>
+            </div>
+
+            <button id="btn-generate-note-plan" class="action-btn gradient-accent full-width btn-large mt-16">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+              note記事の企画案をAI生成する
+            </button>
+          </div>
+
+          <!-- Output Container for Generated Note Plan -->
+          <div id="note-plan-output-container" class="note-plan-box hidden">
+            <div class="plan-result-header">
+              <span class="plan-status-tag">✨ 生成された企画案</span>
+              <div class="plan-actions">
+                <button id="btn-copy-plan-md" class="pill-btn" title="Markdownをクリップボードにコピー">
+                  📋 Markdownコピー
+                </button>
+                <button id="btn-download-plan-md" class="pill-btn" title="ファイルとして保存">
+                  💾 保存
+                </button>
+              </div>
+            </div>
+            <div id="note-plan-content" class="markdown-preview-area"></div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="bottom-nav">
+      <button class="nav-item active" data-view="view-tree">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+        </svg>
+        <span>目次ツリー</span>
+      </button>
+
+      <button class="nav-item" data-view="view-memos">
+        <div class="nav-icon-badge-wrapper">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span id="nav-badge-count" class="nav-badge">0</span>
+        </div>
+        <span>メモ一覧</span>
+      </button>
+
+      <button class="nav-item" data-view="view-studio">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+        </svg>
+        <span>note企画</span>
+      </button>
+    </nav>
+
+    <!-- MODAL 1: メモ記録ボトムシート (Voice & Text Input) -->
+    <div id="modal-memo-sheet" class="modal-overlay hidden">
+      <div class="bottom-sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+          <div class="sheet-title-group">
+            <span id="memo-sheet-chapter" class="sheet-sub">第1章 1-1</span>
+            <h3 id="memo-sheet-title" class="sheet-title">メモを記録</h3>
+          </div>
+          <button id="btn-close-memo-sheet" class="modal-close-btn">&times;</button>
+        </div>
+
+        <div class="sheet-body">
+          <!-- Voice Recording Bar -->
+          <div class="voice-recorder-bar">
+            <button id="btn-record-toggle" class="voice-record-btn">
+              <span class="record-pulse-ring"></span>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                <line x1="12" y1="19" x2="12" y2="22"></line>
+              </svg>
+            </button>
+            <div class="voice-status-info">
+              <div id="voice-status-text" class="voice-status-label">タップして音声録音を開始</div>
+              <div id="voice-wave-anim" class="voice-waves hidden">
+                <span></span><span></span><span></span><span></span><span></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Memo Text Area -->
+          <div class="form-group mt-12">
+            <label for="input-memo-text" class="sr-only">メモ内容</label>
+            <textarea id="input-memo-text" class="memo-textarea" placeholder="読書しながら思いついたこと、気づき、生の声を入力または音声で吹き込んでください..."></textarea>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="sheet-footer">
+            <button id="btn-save-memo-ai" class="action-btn gradient-accent flex-1">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+              AIで構造化して保存
+            </button>
+            <button id="btn-save-memo-raw" class="action-btn secondary">
+              そのまま保存
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 2: 目次画像アップロード＆AIパースモーダル (複数ページ目次完全対応) -->
+    <div id="modal-toc-import" class="modal-overlay hidden">
+      <div class="modal-dialog modal-dialog-large">
+        <div class="modal-header">
+          <h3 class="modal-title">📷 紙の本の目次を取り込む</h3>
+          <button id="btn-close-toc-modal" class="modal-close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-desc">目次が複数ページにわたる場合も、1ページ目から順に撮影・追加することでAIが1つの完全なツリーに統合します。</p>
+
+          <!-- Multi-Page Action Toolbar -->
+          <div class="toc-step-bar">
+            <div class="toc-step-info">
+              <span class="step-badge" id="toc-page-badge">0 ページ選択中</span>
+              <span class="step-hint">改ページ順に並べてください</span>
+            </div>
+            <div class="toc-step-buttons">
+              <button id="btn-add-toc-page" class="action-btn-small gradient-accent" title="ページを追加">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                <span>＋ ページを追加</span>
+              </button>
+              <button id="btn-clear-toc-pages" class="action-btn-small secondary hidden" title="全クリア">クリア</button>
+              <input type="file" id="file-toc-input" accept="image/*" multiple capture="environment" class="file-input-hidden">
+            </div>
+          </div>
+
+          <!-- Empty State Dropzone -->
+          <div id="dropzone-toc" class="upload-dropzone">
+            <div class="dropzone-content">
+              <div class="dropzone-icon">📸</div>
+              <p class="dropzone-main">ここをタップして目次ページを撮影または選択</p>
+              <p class="dropzone-sub">※複数ページある場合は「＋ ページを追加」で何枚でも追加できます</p>
+            </div>
+          </div>
+
+          <!-- Multi-Page Thumbnail Strip & Order Arranger -->
+          <div id="toc-page-list-container" class="toc-pages-grid hidden"></div>
+
+          <!-- Multi-Page AI Guidance Alert -->
+          <div class="info-callout mt-12">
+            <div class="callout-icon">💡</div>
+            <div class="callout-text">
+              <strong>複数ページ取り込みの工夫:</strong> ページをまたいで章や節が分断されていても、AIがページ順（P.1 → P.2...）を読み解き、1つの連続した章・節ツリーに自動結合します。順序が異なる場合はカードの「◀」「▶」で並び替えてください。
+            </div>
+          </div>
+
+          <!-- AI Parsed Result Preview Stage (Hidden by default) -->
+          <div id="toc-parsed-preview-box" class="parsed-preview-card hidden">
+            <div class="preview-header">
+              <span class="preview-status-pill">✨ 解析成功プレビュー</span>
+              <span id="toc-parsed-count" class="preview-count">0 章 / 0 節</span>
+            </div>
+            <div id="toc-parsed-list" class="parsed-tree-summary"></div>
+          </div>
+
+          <!-- Raw Text / Manual Edit Fallback -->
+          <details class="manual-toc-accordion mt-16">
+            <summary class="text-link-btn">またはテキスト貼り付け・手動入力で登録</summary>
+            <textarea id="manual-toc-text" class="manual-toc-textarea mt-8" placeholder="第1章 タイトル&#10;  1-1 節タイトル&#10;  1-2 節タイトル&#10;第2章 タイトル..."></textarea>
+          </details>
+        </div>
+
+        <div class="modal-footer">
+          <div id="toc-parse-loading" class="ai-processing-indicator hidden">
+            <span class="spinner-dot"></span>
+            <span id="toc-loading-text">Gemini Vision で複数ページの目次を統合解析中...</span>
+          </div>
+          <button id="btn-parse-toc-ai" class="action-btn gradient-accent full-width" disabled>
+            ✨ AIで目次ツリーを自動解析
+          </button>
+          <button id="btn-confirm-toc" class="action-btn primary full-width hidden">
+            ✅ この目次ツリーを適用して保存
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 3: 書籍追加・編集モーダル (表紙・背後撮影による自動転記機能搭載) -->
+    <div id="modal-book-edit" class="modal-overlay hidden">
+      <div class="modal-dialog modal-dialog-large">
+        <div class="modal-header">
+          <h3 id="book-modal-title" class="modal-title">書籍の追加</h3>
+          <button id="btn-close-book-modal" class="modal-close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          
+          <!-- Photo Auto-Extraction Section -->
+          <div class="camera-auto-box">
+            <div class="camera-box-header">
+              <span class="box-title">📷 表紙・背後（裏表紙）撮影で自動転記</span>
+              <span class="box-sub">タイトル・著者・出版年月・あらすじを自動読取</span>
+            </div>
+
+            <div class="book-camera-dual-grid">
+              <!-- Front Cover Card -->
+              <div class="photo-capture-card" id="card-cover-photo">
+                <div class="photo-label">① 本の表紙（表）</div>
+                <div class="photo-preview-slot" id="slot-cover-front">
+                  <div class="photo-placeholder">
+                    <span class="icon">📘</span>
+                    <span class="text">表紙を撮影</span>
+                  </div>
+                  <img id="img-preview-front" src="" alt="表紙プレビュー" class="preview-img hidden">
+                  <button id="btn-remove-cover-front" class="photo-remove-btn hidden" title="写真を削除">&times;</button>
+                </div>
+                <button type="button" id="btn-snap-cover-front" class="action-btn-small secondary">
+                  📷 表紙を撮影 / 選択
+                </button>
+                <input type="file" id="file-cover-front" accept="image/*" capture="environment" class="file-input-hidden">
+              </div>
+
+              <!-- Back Cover / Description Card -->
+              <div class="photo-capture-card" id="card-back-photo">
+                <div class="photo-label">② 背後の説明文・奥付（裏）</div>
+                <div class="photo-preview-slot" id="slot-cover-back">
+                  <div class="photo-placeholder">
+                    <span class="icon">📄</span>
+                    <span class="text">裏表紙・奥付を撮影</span>
+                  </div>
+                  <img id="img-preview-back" src="" alt="背後プレビュー" class="preview-img hidden">
+                  <button id="btn-remove-cover-back" class="photo-remove-btn hidden" title="写真を削除">&times;</button>
+                </div>
+                <button type="button" id="btn-snap-cover-back" class="action-btn-small secondary">
+                  📷 背後を撮影 / 選択
+                </button>
+                <input type="file" id="file-cover-back" accept="image/*" capture="environment" class="file-input-hidden">
+              </div>
+            </div>
+
+            <!-- OCR Auto Extraction Action Button -->
+            <div class="auto-extract-footer">
+              <button type="button" id="btn-extract-book-ai" class="action-btn gradient-accent full-width" disabled>
+                ✨ AIで表紙・背後から書籍情報を自動読取
+              </button>
+              <div id="book-extract-loading" class="ai-processing-indicator hidden">
+                <span class="spinner-dot"></span>
+                <span>Gemini Vision で書籍情報を高精度抽出中...</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Manual / Auto-Filled Form Fields -->
+          <div class="book-fields-section">
+            <div class="form-group">
+              <label for="input-book-title">書籍タイトル <span class="required">*</span></label>
+              <input type="text" id="input-book-title" class="form-input" placeholder="例: 一級建築士の現場思考術">
+            </div>
+
+            <div class="form-grid-dual mt-12">
+              <div class="form-group">
+                <label for="input-book-author">著者名</label>
+                <input type="text" id="input-book-author" class="form-input" placeholder="例: 建築 太郎">
+              </div>
+              <div class="form-group">
+                <label for="input-book-published">出版年月</label>
+                <input type="text" id="input-book-published" class="form-input" placeholder="例: 2024年4月">
+              </div>
+            </div>
+
+            <div class="form-grid-dual mt-12">
+              <div class="form-group">
+                <label for="input-book-publisher">出版社</label>
+                <input type="text" id="input-book-publisher" class="form-input" placeholder="例: 〇〇出版">
+              </div>
+              <div class="form-group">
+                <label for="input-book-theme">テーマ・ジャンル</label>
+                <input type="text" id="input-book-theme" class="form-input" placeholder="例: 建築・施工管理 / 不動産投資">
+              </div>
+            </div>
+
+            <div class="form-group mt-12">
+              <label for="input-book-description">背後説明文・あらすじ（裏表紙/帯の解説文）</label>
+              <textarea id="input-book-description" class="form-textarea" rows="3" placeholder="裏表紙や帯に書かれた本の内容紹介、キャッチコピー、推薦文など"></textarea>
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <button id="btn-delete-book" class="action-btn danger hidden">削除</button>
+          <button id="btn-save-book" class="action-btn primary flex-1">保存する</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 4: 設定モーダル (APIキー・環境設定) -->
+    <div id="modal-settings" class="modal-overlay hidden">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h3 class="modal-title">⚙️ 設定・連携</h3>
+          <button id="btn-close-settings-modal" class="modal-close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="input-gemini-key">Google Gemini API キー</label>
+            <input type="password" id="input-gemini-key" class="form-input" placeholder="AIzaSy...">
+            <p class="field-hint">
+              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio</a> で無料取得したAPIキーを入力してください。端末内のストレージ（IndexedDB/localStorage）に安全に保存され、外部サーバーを介さず直接Geminiへ通信します。
+            </p>
+          </div>
+
+          <div class="form-group mt-16">
+            <label for="select-gemini-model">使用AIモデル</label>
+            <select id="select-gemini-model" class="form-select">
+              <option value="gemini-2.0-flash">gemini-2.0-flash (最新・超高速・推奨)</option>
+              <option value="gemini-1.5-flash">gemini-1.5-flash (安定・高速)</option>
+              <option value="gemini-1.5-pro">gemini-1.5-pro (高精度・深層分析)</option>
+            </select>
+          </div>
+
+          <div class="setting-divider"></div>
+
+          <div class="form-group">
+            <label>サンプルデータ</label>
+            <p class="field-hint mb-8">実際の書籍・目次・雪国アーキパパメモのサンプルデータを読み込み、すぐに使用感を体験できます。</p>
+            <button id="btn-load-sample-data" class="action-btn secondary full-width">📚 サンプル書籍データを読み込む</button>
+          </div>
+
+          <div class="setting-divider"></div>
+
+          <div class="form-group">
+            <label>データバックアップ</label>
+            <div class="backup-btn-grid">
+              <button id="btn-export-backup" class="action-btn secondary">💾 全データ書き出し (JSON)</button>
+              <button id="btn-import-backup-trigger" class="action-btn secondary">📥 データ復元</button>
+              <input type="file" id="file-backup-input" accept=".json" class="file-input-hidden">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="btn-save-settings" class="action-btn primary full-width">設定を保存</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

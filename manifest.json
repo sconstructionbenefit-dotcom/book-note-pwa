@@ -1,0 +1,28 @@
+{
+  "name": "読書ノート to note | アイデア集積PWA",
+  "short_name": "読書note",
+  "description": "紙の本の目次から音声・テキストで知識とアイデアを蓄積し、note記事を爆速で企画・生成する専用PWA",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
