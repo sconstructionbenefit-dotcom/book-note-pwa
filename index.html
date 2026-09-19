@@ -497,7 +497,11 @@
         <div class="modal-body">
           <div class="form-group">
             <label for="input-gemini-key">Google Gemini API キー</label>
-            <input type="password" id="input-gemini-key" class="form-input" placeholder="AIzaSy...">
+            <div class="api-key-input-wrapper">
+              <input type="password" id="input-gemini-key" class="form-input api-key-input" placeholder="AIzaSy..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+              <button type="button" id="btn-toggle-key-visibility" class="key-icon-btn" title="表示/非表示の切替">👁️</button>
+              <button type="button" id="btn-paste-api-key" class="key-paste-btn">📋 貼り付け</button>
+            </div>
             <p class="field-hint">
               <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio</a> で無料取得したAPIキーを入力してください。端末内のストレージ（IndexedDB/localStorage）に安全に保存され、外部サーバーを介さず直接Geminiへ通信します。
             </p>

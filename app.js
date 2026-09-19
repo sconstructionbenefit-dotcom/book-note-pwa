@@ -611,6 +611,8 @@ class AppController {
       modalSettings: document.getElementById('modal-settings'),
       btnCloseSettingsModal: document.getElementById('btn-close-settings-modal'),
       inputGeminiKey: document.getElementById('input-gemini-key'),
+      btnToggleKeyVisibility: document.getElementById('btn-toggle-key-visibility'),
+      btnPasteApiKey: document.getElementById('btn-paste-api-key'),
       selectGeminiModel: document.getElementById('select-gemini-model'),
       btnSaveSettings: document.getElementById('btn-save-settings'),
       btnLoadSampleData: document.getElementById('btn-load-sample-data'),
@@ -675,6 +677,35 @@ class AppController {
     this.ui.btnExportBackup.addEventListener('click', () => this.exportBackupJSON());
     this.ui.btnImportBackupTrigger.addEventListener('click', () => this.ui.fileBackupInput.click());
     this.ui.fileBackupInput.addEventListener('change', (e) => this.importBackupJSON(e));
+
+    // API Key Toggle & Paste
+    if (this.ui.btnToggleKeyVisibility) {
+      this.ui.btnToggleKeyVisibility.addEventListener('click', () => {
+        const isPass = this.ui.inputGeminiKey.type === 'password';
+        this.ui.inputGeminiKey.type = isPass ? 'text' : 'password';
+        this.ui.btnToggleKeyVisibility.textContent = isPass ? '🙈' : '👁️';
+      });
+    }
+    if (this.ui.btnPasteApiKey) {
+      this.ui.btnPasteApiKey.addEventListener('click', async () => {
+        try {
+          if (navigator.clipboard && navigator.clipboard.readText) {
+            const text = await navigator.clipboard.readText();
+            if (text && text.trim()) {
+              this.ui.inputGeminiKey.value = text.trim();
+              this.showToast('📋 クリップボードからAPIキーを貼り付けました');
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn('Clipboard readText failed or denied:', err);
+        }
+        // Fallback: focus and select
+        this.ui.inputGeminiKey.focus();
+        this.ui.inputGeminiKey.select();
+        this.showToast('入力欄をタップして貼り付けてください');
+      });
+    }
 
     // TOC Tree Actions
     this.ui.btnExpandAll.addEventListener('click', () => this.toggleAllChapters(true));

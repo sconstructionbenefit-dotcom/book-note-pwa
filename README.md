@@ -48,14 +48,17 @@ python3 /home/sconstructionbenefit/brain/note/20260914_読書メモ_noteアイ�
 ```
 ブラウザで [http://localhost:8088](http://localhost:8088) を開きます。
 
-### 2. スマートフォンで使う場合
-#### A. 同一Wi-Fi環境からアクセス
-1. PC上で上記サーバーを起動。
-2. 同一Wi-Fi内のスマホのSafari/Chromeから、PCのIPアドレス（例: `http://192.168.x.x:8088`）にアクセス。
-3. ブラウザの共有メニューから **「ホーム画面に追加」** をタップ。
+### 2. スマートフォンで使う場合（推奨：GitHub Pages 永続公開）
+本アプリは専用の公開リポジトリにて GitHub Pages が完全稼働しています。PCの起動不要で、スマートフォン単体から24時間いつでもアクセス・利用可能です。
 
-#### B. 静的ホスティング（GitHub Pages / Vercel 等）
-本アプリはHTML/CSS/JSのみの静的PWAのため、GitHubリポジトリのGitHub Pagesを有効化するだけで、インターネット経由でスマホ単体から24時間いつでもアクセス・利用可能です。
+🔗 **本番アクセスURL**:
+👉 **[https://sconstructionbenefit-dotcom.github.io/book-note-pwa/](https://sconstructionbenefit-dotcom.github.io/book-note-pwa/)**
+
+#### ホーム画面への追加手順
+1. スマートフォンの Safari（iPhone）または Chrome（Android）で上記URLを開く。
+2. **iPhoneの場合**: 画面下の「共有ボタン」→ **「ホーム画面に追加」** をタップ。
+3. **Androidの場合**: 右上の「メニュー」→ **「ホーム画面に追加」** または **「アプリをインストール」** をタップ。
+4. ホーム画面に専用アイコン（📖 **読書note**）が生成され、全画面アプリとして起動可能になります。
 
 ---
 
