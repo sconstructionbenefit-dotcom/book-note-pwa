@@ -1258,13 +1258,13 @@ input, textarea, select, [contenteditable="true"], .selectable-text {
 }
 
 .file-input-hidden {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
+  display: none !important;
+  position: absolute !important;
+  width: 0 !important;
+  height: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  clip: rect(0, 0, 0, 0) !important;
 }
 
 .dropzone-icon {
@@ -1850,6 +1850,7 @@ input, textarea, select, [contenteditable="true"], .selectable-text {
   clip: rect(0, 0, 0, 0);
   border: 0;
   opacity: 0;
+  pointer-events: none;
 }
 
 .photo-placeholder {

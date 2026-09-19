@@ -325,7 +325,7 @@
                 <span>＋ ページを追加</span>
               </button>
               <button id="btn-clear-toc-pages" class="action-btn-small secondary hidden" title="全クリア">クリア</button>
-              <input type="file" id="file-toc-input" accept="image/*" multiple capture="environment" class="file-input-hidden">
+              <input type="file" id="file-toc-input" accept="image/*" multiple style="display: none;" aria-hidden="true">
             </div>
           </div>
 
@@ -531,7 +531,7 @@
             <div class="backup-btn-grid">
               <button id="btn-export-backup" class="action-btn secondary">💾 全データ書き出し (JSON)</button>
               <button id="btn-import-backup-trigger" class="action-btn secondary">📥 データ復元</button>
-              <input type="file" id="file-backup-input" accept=".json" class="file-input-hidden">
+              <input type="file" id="file-backup-input" accept=".json" style="display: none;" aria-hidden="true">
             </div>
           </div>
         </div>
