@@ -1,4 +1,4 @@
-const CACHE_NAME = 'book-note-pwa-v6';
+const CACHE_NAME = 'book-note-pwa-v7';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

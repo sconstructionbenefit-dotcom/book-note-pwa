@@ -140,7 +140,7 @@ class BookNoteDB {
 // 2. Gemini API Service
 // ==========================================================================
 class GeminiService {
-  constructor(apiKey = '', model = 'gemini-3.8-flash') {
+  constructor(apiKey = '', model = 'gemini-2.5-flash') {
     this.apiKey = apiKey;
     this.model = model;
   }
@@ -157,12 +157,13 @@ class GeminiService {
     return Boolean(this.apiKey && this.apiKey.trim().length > 10);
   }
 
-  async callGemini(prompt, images = [], isJson = false) {
+  async callGemini(prompt, images = [], isJson = false, retryCount = 0, currentModel = null) {
     if (!this.hasApiKey()) {
       throw new Error('Gemini APIキーが設定されていません。画面右上の⚙️設定から無料のAPIキーを入力してください。');
     }
 
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey.trim()}`;
+    const modelToUse = currentModel || this.model || 'gemini-2.5-flash';
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${this.apiKey.trim()}`;
 
     const parts = [];
 
@@ -191,31 +192,54 @@ class GeminiService {
       genConfig.responseMimeType = "application/json";
     }
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts }],
-        generationConfig: genConfig
-      })
-    });
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: genConfig
+        })
+      });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      let msg = `Gemini API エラー (${response.status})`;
-      try {
-        const errObj = JSON.parse(errText);
-        if (errObj.error?.message) {
-          msg += `: ${errObj.error.message}`;
+      if (!response.ok) {
+        const errText = await response.text();
+        let errMsg = `Gemini API エラー (${response.status})`;
+        try {
+          const errObj = JSON.parse(errText);
+          if (errObj.error?.message) {
+            errMsg += `: ${errObj.error.message}`;
+          }
+        } catch (e) {
+          errMsg += `: ${errText.slice(0, 100)}`;
         }
-      } catch (e) {
-        msg += `: ${errText.slice(0, 100)}`;
-      }
-      throw new Error(msg);
-    }
 
-    const data = await response.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        // Automatic retry with exponential backoff on 503 (high demand) or 429 (rate limit)
+        if ((response.status === 503 || response.status === 429) && retryCount < 2) {
+          console.warn(`Gemini temporary error (${response.status}) on ${modelToUse}. Retrying in ${(retryCount + 1) * 1.5}s... (attempt ${retryCount + 1})`);
+          await new Promise(r => setTimeout(r, (retryCount + 1) * 1500));
+          return this.callGemini(prompt, images, isJson, retryCount + 1, modelToUse);
+        }
+
+        // Automatic fallback to ultra-reliable gemini-2.5-flash if model is overloaded or unrecognized
+        if (modelToUse !== 'gemini-2.5-flash' && (response.status === 503 || response.status === 404 || response.status === 400)) {
+          console.warn(`Model ${modelToUse} failed with ${response.status}. Automatically falling back to stable gemini-2.5-flash...`);
+          return this.callGemini(prompt, images, isJson, 0, 'gemini-2.5-flash');
+        }
+
+        throw new Error(errMsg);
+      }
+
+      const data = await response.json();
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    } catch (err) {
+      // Network/Fetch level fallback
+      if (modelToUse !== 'gemini-2.5-flash' && retryCount === 0 && !err.message.includes('APIキー')) {
+        console.warn(`Network error on ${modelToUse}, trying gemini-2.5-flash fallback:`, err);
+        return this.callGemini(prompt, images, isJson, 1, 'gemini-2.5-flash');
+      }
+      throw err;
+    }
   }
 
   /**
@@ -864,9 +888,9 @@ class AppController {
   // ========================================================================
   async loadSettings() {
     const apiKey = await this.db.getSetting('gemini_api_key', '');
-    let model = await this.db.getSetting('gemini_model', 'gemini-3.8-flash');
-    if (!model || model.includes('gemini-2') || model.includes('gemini-1')) {
-      model = 'gemini-3.8-flash';
+    let model = await this.db.getSetting('gemini_model', 'gemini-2.5-flash');
+    if (!model || model.includes('gemini-2.0') || model.includes('gemini-1') || model.includes('gemini-3.8') || model.includes('gemini-3.6')) {
+      model = 'gemini-2.5-flash';
       await this.db.saveSetting('gemini_model', model);
     }
     this.gemini.setApiKey(apiKey);
