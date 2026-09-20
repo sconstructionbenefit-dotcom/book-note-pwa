@@ -140,7 +140,7 @@ class BookNoteDB {
 // 2. Gemini API Service
 // ==========================================================================
 class GeminiService {
-  constructor(apiKey = '', model = 'gemini-2.5-flash') {
+  constructor(apiKey = '', model = 'gemini-3.6-flash') {
     this.apiKey = apiKey;
     this.model = model;
   }
@@ -162,7 +162,7 @@ class GeminiService {
       throw new Error('Gemini APIキーが設定されていません。画面右上の⚙️設定から無料のAPIキーを入力してください。');
     }
 
-    const modelToUse = currentModel || this.model || 'gemini-2.5-flash';
+    const modelToUse = currentModel || this.model || 'gemini-3.6-flash';
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${this.apiKey.trim()}`;
 
     const parts = [];
@@ -221,10 +221,10 @@ class GeminiService {
           return this.callGemini(prompt, images, isJson, retryCount + 1, modelToUse);
         }
 
-        // Automatic fallback to ultra-reliable gemini-2.5-flash if model is overloaded or unrecognized
-        if (modelToUse !== 'gemini-2.5-flash' && (response.status === 503 || response.status === 404 || response.status === 400)) {
-          console.warn(`Model ${modelToUse} failed with ${response.status}. Automatically falling back to stable gemini-2.5-flash...`);
-          return this.callGemini(prompt, images, isJson, 0, 'gemini-2.5-flash');
+        // Automatic fallback to official recommended gemini-3.6-flash if model is unrecognized or no longer available
+        if (modelToUse !== 'gemini-3.6-flash' && (response.status === 503 || response.status === 404 || response.status === 400)) {
+          console.warn(`Model ${modelToUse} failed with ${response.status}. Automatically falling back to official recommended gemini-3.6-flash...`);
+          return this.callGemini(prompt, images, isJson, 0, 'gemini-3.6-flash');
         }
 
         throw new Error(errMsg);
@@ -234,9 +234,9 @@ class GeminiService {
       return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     } catch (err) {
       // Network/Fetch level fallback
-      if (modelToUse !== 'gemini-2.5-flash' && retryCount === 0 && !err.message.includes('APIキー')) {
-        console.warn(`Network error on ${modelToUse}, trying gemini-2.5-flash fallback:`, err);
-        return this.callGemini(prompt, images, isJson, 1, 'gemini-2.5-flash');
+      if (modelToUse !== 'gemini-3.6-flash' && retryCount === 0 && !err.message.includes('APIキー')) {
+        console.warn(`Network error on ${modelToUse}, trying gemini-3.6-flash fallback:`, err);
+        return this.callGemini(prompt, images, isJson, 1, 'gemini-3.6-flash');
       }
       throw err;
     }
@@ -888,9 +888,9 @@ class AppController {
   // ========================================================================
   async loadSettings() {
     const apiKey = await this.db.getSetting('gemini_api_key', '');
-    let model = await this.db.getSetting('gemini_model', 'gemini-2.5-flash');
-    if (!model || model.includes('gemini-2.0') || model.includes('gemini-1') || model.includes('gemini-3.8') || model.includes('gemini-3.6')) {
-      model = 'gemini-2.5-flash';
+    let model = await this.db.getSetting('gemini_model', 'gemini-3.6-flash');
+    if (!model || model.includes('gemini-2.') || model.includes('gemini-1.') || model.includes('gemini-3.8')) {
+      model = 'gemini-3.6-flash';
       await this.db.saveSetting('gemini_model', model);
     }
     this.gemini.setApiKey(apiKey);
