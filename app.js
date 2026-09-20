@@ -185,8 +185,8 @@ class GeminiService {
     parts.push({ text: prompt });
 
     const genConfig = {
-      temperature: 0.2,
-      maxOutputTokens: 2048,
+      temperature: 0.1,
+      maxOutputTokens: 8192,
     };
     if (isJson) {
       genConfig.responseMimeType = "application/json";
@@ -406,41 +406,40 @@ class GeminiService {
   async parseTOC(images = [], rawText = '') {
     const isMultiPage = images.length > 1;
     const prompt = `
-あなたは書籍の目次構造を正確に解析するプロフェッショナルです。
-提供された${images.length}枚の画像${isMultiPage ? '（複数ページにわたる目次ページ群）' : ''}またはテキストから、書籍の目次（章・節・項）を正確に抽出・階層化し、必ず以下のJSON配列形式のみを出力してください。
-Markdown記法や説明文、前置き、コードブロックバッククォート（\`\`\`json等）は一切含めず、純粋なJSON配列のみを返してください。
+あなたは書籍の目次構造を高精度に解析する専門AIです。
+提供された${images.length}枚の目次画像${isMultiPage ? '（複数ページにわたる連続した目次写真群）' : ''}または手動入力テキストから、書籍全体の目次構造（章・節・項・コラム・事例）を漏れなく完全に抽出・階層化し、必ず以下のJSON配列形式のみを出力してください。
+Markdownのバッククォート（\`\`\`json等）や前置き、解説文は一切含めず、純粋なJSON文字列のみを返してください。
 
-【出力JSONフォーマット】
+【出力JSONスキーマ】
 [
   {
     "id": "c1",
-    "chapterNumber": "第1章",
-    "chapterTitle": "章のタイトル",
+    "chapterNumber": "章番号（例: 序章、第1章、第2章、または章番号がなければ空文字\"\"）",
+    "chapterTitle": "章の大見出しタイトル（書籍に書かれている実際の完全なタイトル文字列）",
     "sections": [
       {
         "id": "s1_1",
-        "sectionNumber": "1-1",
-        "sectionTitle": "節のタイトル"
-      },
-      {
-        "id": "s1_2",
-        "sectionNumber": "1-2",
-        "sectionTitle": "節のタイトル"
+        "sectionNumber": "節番号（例: 1-1、①、Case 1、または番号がなければ空文字\"\"）",
+        "sectionTitle": "節・項・小見出しのタイトル（書籍に書かれている実際の文字列）"
       }
     ]
   }
 ]
 
-【複数ページ取り込み・パースの厳格指示】
+【重要解析ルール（最優先厳守事項）】
+1. 【画像の向きの自動補正】: 写真が上下逆さま（180度倒立）や90度横向きになっている場合でも、AIの視覚認識により文字の向きを自動的に判断・補正して正確に読み取ってください。
+2. 【見開き2ページの読書順】: 1枚の画像に見開き（左右2ページ）が写っている場合、書籍の形式（縦書きなら右ページから左ページ、横書きなら左ページから右ページ）に従って、正しい順序で章や節を抽出してください。
+3. 【全章・全節の漏れなき完全抽出】:
+   - 「巻頭」「はじめに」「序章」「第1章」〜「第N章」「COLUMN」「ケーススタディ」「おわりに」など、書籍に含まれるすべての章・区分を漏れなく大見出し（chapterTitle）として抽出してください。
+   - 各章配下に存在するすべての小見出し、番号付き項目（1, 2, 3... / ①, ②, ③...）、箇条書き項目、実例ケースを漏れなく sections 配列に格納してください。
+   - ダミー文字列（「章のタイトル」「節のタイトル」等）を出力することは固く禁止します。必ず写真内の文字を正確に転記してください。
 ${isMultiPage ? `
-1. 画像は第1ページ目から最終ページ目へと順番（Page 1 → Page 2 → ...）に並んでいます。
-2. ページをまたいで章や節が改ページされている場合、前ページの末尾の章と次ページの冒頭の節を正確に1つの章オブジェクトにマージ（結合）してください。
-3. 同一の章が2つのページに分かれている場合、章オブジェクトを重複して作らず、同一の章のsections配列に節を追加してください。
-4. 全ページを通して、第1章から最終章まで欠落なく連続した1本の目次ツリーに統合してください。
+4. 【複数ページの自動マージ】:
+   - 画像は Page 1 から順に並んでいます。
+   - ページをまたいで章が続いている場合（前ページの終わりに始まった第2章が次ページにも続いている場合など）、章オブジェクトを重複して作成せず、同一の章の sections 配列に次ページの項目を連結してください。
 ` : ''}
-5. ページ番号（「p.24」「15頁」などのノンブル数字）やドットリーダー（……）はタイトルから完全に除去し、純粋な章・節タイトルのみを抽出してください。
-6. 序章、終章、はじめに、おわりに、プロローグ、エピローグ等の章番号がないものも1つの章オブジェクト（chapterNumber: "", chapterTitle: "おわりに"等）として構成してください。
-7. 各IDは一意な文字列（c1, c2..., s1_1, s1_2...）を連番で付与してください。
+5. 【不要記号のクレンジング】: ページ番号（ノンブル数字「…… 84」等）やドットリーダー記号（……、---）はタイトル文字列から除外してください。
+6. 各要素の id にはユニークなID（c1, c2..., s1_1, s1_2...）を連番で付与してください。
 ${rawText ? `\n【手動入力テキスト】:\n${rawText}` : ''}
 `;
 
@@ -1595,13 +1594,27 @@ class AppController {
         <div class="toc-page-img-wrap">
           <img src="${page.dataUrl}" alt="目次P${index + 1}" class="toc-page-thumb">
           <span class="page-order-badge">P.${index + 1}</span>
+          <button type="button" class="page-quick-rotate" title="90°右回転">🔄</button>
         </div>
         <div class="toc-page-actions">
           <button type="button" class="page-ctrl-btn move-left" title="前へ" ${index === 0 ? 'disabled' : ''}>◀</button>
+          <button type="button" class="page-ctrl-btn page-rotate-btn" title="画像を90°回転">🔄 回転</button>
           <button type="button" class="page-ctrl-btn move-right" title="次へ" ${index === count - 1 ? 'disabled' : ''}>▶</button>
           <button type="button" class="page-ctrl-btn page-del-btn" title="削除">&times;</button>
         </div>
       `;
+
+      // Quick Rotate on thumbnail badge
+      card.querySelector('.page-quick-rotate').addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.rotateTOCPage(index);
+      });
+
+      // Rotate Button in action bar
+      card.querySelector('.page-rotate-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.rotateTOCPage(index);
+      });
 
       // Move Left
       card.querySelector('.move-left').addEventListener('click', (e) => {
@@ -1622,6 +1635,57 @@ class AppController {
       });
 
       container.appendChild(card);
+    });
+  }
+
+  /**
+   * 目次写真の90°時計回り回転処理（Canvas利用）
+   */
+  async rotateTOCPage(index) {
+    const page = this.pendingTOCPages[index];
+    if (!page || !page.dataUrl) return;
+
+    try {
+      this.showToast(`P.${index + 1} を回転中...`);
+      const rotatedDataUrl = await this.rotateImageDataUrl(page.dataUrl, 90);
+      page.dataUrl = rotatedDataUrl;
+      page.base64 = rotatedDataUrl.split(',')[1];
+      this.renderTOCPageList();
+      this.showToast(`✅ P.${index + 1} を90°回転しました`);
+    } catch (err) {
+      console.error('Rotate image failed:', err);
+      alert('画像の回転に失敗しました: ' + err.message);
+    }
+  }
+
+  /**
+   * Canvasを使ってDataURL画像を任意の角度（時計回り）に回転
+   */
+  rotateImageDataUrl(dataUrl, degrees = 90) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const rad = (degrees * Math.PI) / 180;
+
+        if (degrees === 90 || degrees === 270) {
+          canvas.width = img.height;
+          canvas.height = img.width;
+        } else {
+          canvas.width = img.width;
+          canvas.height = img.height;
+        }
+
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate(rad);
+        ctx.drawImage(img, -img.width / 2, -img.height / 2);
+
+        resolve(canvas.toDataURL('image/jpeg', 0.88));
+      };
+      img.onerror = (e) => reject(new Error('画像の読み込みに失敗しました'));
+      img.src = dataUrl;
     });
   }
 
@@ -1674,12 +1738,15 @@ class AppController {
     try {
       let parsedTOC = null;
 
-      if (this.gemini.hasApiKey()) {
-        parsedTOC = await this.gemini.parseTOC(images, manualText);
+      if (!this.gemini.hasApiKey()) {
+        if (manualText && manualText.trim().length > 0) {
+          parsedTOC = this.fallbackParseTOCText(manualText);
+          this.showToast('APIキー未設定のため、入力テキストから目次を抽出しました');
+        } else {
+          throw new Error('Gemini APIキーが設定されていません。画面右上の⚙️設定から無料のAPIキーを入力してください。');
+        }
       } else {
-        // Fallback parser if API key is not yet set
-        parsedTOC = this.fallbackParseTOCText(manualText);
-        this.showToast('APIキー未設定のため、テキスト規則から自動展開しました');
+        parsedTOC = await this.gemini.parseTOC(images, manualText);
       }
 
       if (!parsedTOC || parsedTOC.length === 0) {
@@ -1699,13 +1766,17 @@ class AppController {
       this.showToast('✨ 目次ツリーの解析に成功しました！プレビューを確認して適用してください。');
 
     } catch (err) {
-      console.error('Gemini parseTOC failed, applying fallback rescue:', err);
-      const rescuedTOC = this.fallbackParseTOCText(manualText);
-      this.parsedTOCData = rescuedTOC;
-      this.renderTOCParsedPreview(rescuedTOC);
-      btn.classList.add('hidden');
-      this.ui.btnConfirmTOC.classList.remove('hidden');
-      this.showToast('⚠️ 目次を自動復元しました。プレビューをご確認の上で適用してください。');
+      console.error('Gemini parseTOC failed:', err);
+      if (manualText && manualText.trim().length > 0) {
+        const rescuedTOC = this.fallbackParseTOCText(manualText);
+        this.parsedTOCData = rescuedTOC;
+        this.renderTOCParsedPreview(rescuedTOC);
+        btn.classList.add('hidden');
+        this.ui.btnConfirmTOC.classList.remove('hidden');
+        this.showToast('⚠️ 入力テキストから目次ツリーを復元しました。');
+      } else {
+        alert(`⚠️ 目次の解析に失敗しました\n\n【詳細】: ${err.message}\n\n【改善のヒント】\n・写真が上下逆さまや横向きの場合は、各写真の「🔄」または「🔄 回転」ボタンを押して文字がまっすぐ読める向きにしてから再度お試しください。\n・APIキーが正しいか右上の⚙️設定をご確認ください。`);
+      }
     } finally {
       btn.disabled = false;
       this.ui.tocParseLoading.classList.add('hidden');
