@@ -269,18 +269,134 @@ class GeminiService {
 
     const resultText = await this.callGemini(prompt, images, true);
     
-    // Robust JSON extraction
-    try {
-      return JSON.parse(resultText.trim());
-    } catch (e) {
-      const cleaned = resultText.replace(/^```[a-z]*\n?/gim, '').replace(/```$/gm, '').trim();
-      const firstBrace = cleaned.indexOf('{');
-      const lastBrace = cleaned.lastIndexOf('}');
-      if (firstBrace !== -1 && lastBrace !== -1) {
-        return JSON.parse(cleaned.substring(firstBrace, lastBrace + 1));
-      }
-      throw new Error('AIが返した書籍情報のJSONパースに失敗しました。');
+    return this.safeParseJSON(resultText, false);
+  }
+  /**
+   * AIの出力から確実にJSONを抽出・修復してパースする堅牢パーサー
+   */
+  safeParseJSON(text, isArray = true) {
+    if (!text || typeof text !== 'string') {
+      return isArray ? [] : {};
     }
+
+    // 1. コードブロック記法と前後の空白の除去
+    let cleaned = text.replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+
+    // 2. 境界（[ ... ] または { ... }）の厳密な抽出
+    const startChar = isArray ? '[' : '{';
+    const endChar = isArray ? ']' : '}';
+    const firstIdx = cleaned.indexOf(startChar);
+    const lastIdx = cleaned.lastIndexOf(endChar);
+
+    if (firstIdx !== -1 && lastIdx !== -1 && lastIdx > firstIdx) {
+      cleaned = cleaned.substring(firstIdx, lastIdx + 1);
+    }
+
+    // 3. 末尾カンマの自動除去 (,\s*] や ,\s*})
+    cleaned = cleaned.replace(/,\s*([\]}])/g, '$1');
+
+    // 4. 初回パース試行
+    try {
+      return JSON.parse(cleaned);
+    } catch (err) {
+      console.warn('First JSON.parse attempt failed, attempting aggressive repair:', err);
+    }
+
+    // 5. 積極的なクレンジング（文字列内の未エスケープ改行などの補正）
+    try {
+      const repaired = cleaned.replace(/(?<=:\s*"[^"]*)\r?\n(?=[^"]*")/g, '\\n');
+      return JSON.parse(repaired);
+    } catch (err2) {
+      console.warn('Aggressive JSON repair failed:', err2);
+    }
+
+    // 6. 配列形式の目次であれば、テキスト行から章・節ツリーを自動復元する
+    if (isArray) {
+      return this.heuristicParseTOCText(text);
+    }
+
+    // オブジェクト形式で失敗した場合は、キー抽出による手動復元
+    const titleMatch = text.match(/"title":\s*"([^"]+)"/);
+    const authorMatch = text.match(/"author":\s*"([^"]+)"/);
+    const pubMatch = text.match(/"publishedDate":\s*"([^"]+)"/);
+    const puberMatch = text.match(/"publisher":\s*"([^"]+)"/);
+    const themeMatch = text.match(/"theme":\s*"([^"]+)"/);
+    const descMatch = text.match(/"description":\s*"([^"]+)"/);
+
+    if (titleMatch || authorMatch || descMatch) {
+      return {
+        title: titleMatch ? titleMatch[1] : '不明な書籍',
+        author: authorMatch ? authorMatch[1] : '',
+        publishedDate: pubMatch ? pubMatch[1] : '',
+        publisher: puberMatch ? puberMatch[1] : '',
+        theme: themeMatch ? themeMatch[1] : '',
+        description: descMatch ? descMatch[1] : ''
+      };
+    }
+
+    throw new Error('AIが返したデータをJSONとして解読できませんでした。');
+  }
+
+  /**
+   * JSONパースに失敗した場合でも、生テキストから章・節ツリーを自動復元する救済パーサー
+   */
+  heuristicParseTOCText(rawText) {
+    console.log('Running heuristicParseTOCText fallback on raw AI output...');
+    const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
+    const chapters = [];
+    let currentCh = null;
+    let chIdx = 1;
+    let secIdx = 1;
+
+    for (const line of lines) {
+      if (line === '[' || line === ']' || line === '{' || line === '}' || line.startsWith('"sections"') || line.startsWith('"id"')) continue;
+
+      let text = line;
+      const titleMatch = line.match(/"(?:chapterTitle|title|sectionTitle)":\s*"([^"]+)"/);
+      if (titleMatch) {
+        text = titleMatch[1];
+      } else {
+        text = line.replace(/^["'・\-\*\d\.\s]+/, '').replace(/["',]+$/, '').trim();
+      }
+
+      if (!text || text.length < 2) continue;
+
+      if (text.startsWith('第') || text.includes('章') || text.startsWith('Chapter') || text.includes('はじめに') || text.includes('おわりに') || text.includes('プロローグ') || text.includes('エピローグ') || !currentCh) {
+        currentCh = {
+          id: `c_${chIdx}`,
+          chapterNumber: text.match(/^第[\d一二三四五六七八九十]+章/)?.[0] || `第${chIdx}章`,
+          chapterTitle: text,
+          sections: []
+        };
+        chapters.push(currentCh);
+        chIdx++;
+        secIdx = 1;
+      } else {
+        if (currentCh) {
+          currentCh.sections.push({
+            id: `s_${chIdx - 1}_${secIdx}`,
+            sectionNumber: `${chIdx - 1}-${secIdx}`,
+            sectionTitle: text
+          });
+          secIdx++;
+        }
+      }
+    }
+
+    if (chapters.length > 0) {
+      return chapters;
+    }
+
+    return [
+      {
+        id: 'c1',
+        chapterNumber: '第1章',
+        chapterTitle: '読み取った目次',
+        sections: [
+          { id: 's1_1', sectionNumber: '1-1', sectionTitle: '目次内容' }
+        ]
+      }
+    ];
   }
 
   /**
@@ -291,7 +407,7 @@ class GeminiService {
     const isMultiPage = images.length > 1;
     const prompt = `
 あなたは書籍の目次構造を正確に解析するプロフェッショナルです。
-提供された${images.length}枚の画像${isMultiPage ? '（複数ページにわたる目次ページ群）' : ''}またはテキストから、書籍の目次（章・節・項）を正確に抽出・階層化し、必ず以下のJSON形式のみを出力してください。
+提供された${images.length}枚の画像${isMultiPage ? '（複数ページにわたる目次ページ群）' : ''}またはテキストから、書籍の目次（章・節・項）を正確に抽出・階層化し、必ず以下のJSON配列形式のみを出力してください。
 Markdown記法や説明文、前置き、コードブロックバッククォート（\`\`\`json等）は一切含めず、純粋なJSON配列のみを返してください。
 
 【出力JSONフォーマット】
@@ -328,10 +444,9 @@ ${isMultiPage ? `
 ${rawText ? `\n【手動入力テキスト】:\n${rawText}` : ''}
 `;
 
-    const resultText = await this.callGemini(prompt, images);
-    // Parse clean JSON
-    const cleaned = resultText.replace(/```json/gi, '').replace(/```/g, '').trim();
-    return JSON.parse(cleaned);
+    // 第3引数 isJson = true を指定して application/json を強制
+    const resultText = await this.callGemini(prompt, images, true);
+    return this.safeParseJSON(resultText, true);
   }
 
   /**
@@ -356,9 +471,8 @@ ${rawText ? `\n【手動入力テキスト】:\n${rawText}` : ''}
 }
 `;
 
-    const resultText = await this.callGemini(prompt);
-    const cleaned = resultText.replace(/```json/gi, '').replace(/```/g, '').trim();
-    return JSON.parse(cleaned);
+    const resultText = await this.callGemini(prompt, [], true);
+    return this.safeParseJSON(resultText, false);
   }
 
   /**
@@ -1585,8 +1699,13 @@ class AppController {
       this.showToast('✨ 目次ツリーの解析に成功しました！プレビューを確認して適用してください。');
 
     } catch (err) {
-      console.error(err);
-      alert('目次の解析中にエラーが発生しました: ' + err.message);
+      console.error('Gemini parseTOC failed, applying fallback rescue:', err);
+      const rescuedTOC = this.fallbackParseTOCText(manualText);
+      this.parsedTOCData = rescuedTOC;
+      this.renderTOCParsedPreview(rescuedTOC);
+      btn.classList.add('hidden');
+      this.ui.btnConfirmTOC.classList.remove('hidden');
+      this.showToast('⚠️ 目次を自動復元しました。プレビューをご確認の上で適用してください。');
     } finally {
       btn.disabled = false;
       this.ui.tocParseLoading.classList.add('hidden');
