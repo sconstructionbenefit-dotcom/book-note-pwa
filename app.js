@@ -603,12 +603,140 @@ class VoiceRecognitionHelper {
 }
 
 // ==========================================================================
-// 4. Main Application Controller
+// 4. Google Drive Cloud Sync Helper (GAS Web API Integration)
+// ==========================================================================
+class GoogleDriveSyncHelper {
+  constructor(db) {
+    this.db = db;
+    this.syncUrl = '';
+    this.autoSync = true;
+    this.isSyncing = false;
+  }
+
+  setSyncUrl(url) {
+    this.syncUrl = (url || '').trim();
+  }
+
+  setAutoSync(enabled) {
+    this.autoSync = Boolean(enabled);
+  }
+
+  isConfigured() {
+    return Boolean(this.syncUrl && this.syncUrl.startsWith('https://script.google.com/'));
+  }
+
+  /**
+   * 双方向スマート同期を実行
+   */
+  async sync(onProgress = null) {
+    if (!this.isConfigured()) {
+      throw new Error('Googleドライブ同期URLが設定されていません。設定画面でGAS Web AppのURLを入力してください。');
+    }
+    if (this.isSyncing) {
+      console.warn('Sync is already in progress, skipping concurrent request.');
+      return null;
+    }
+
+    this.isSyncing = true;
+    try {
+      if (onProgress) onProgress('クラウドから最新データを取得中...');
+
+      // 1. Fetch remote data (GET)
+      let remoteData = { books: [], memos: [] };
+      try {
+        const getResp = await fetch(this.syncUrl, {
+          method: 'GET',
+          redirect: 'follow',
+          mode: 'cors'
+        });
+        if (getResp.ok) {
+          const resJson = await getResp.json();
+          if (resJson && Array.isArray(resJson.books)) {
+            remoteData = resJson;
+          }
+        }
+      } catch (getErr) {
+        console.warn('Failed to fetch remote data, attempting local push:', getErr);
+      }
+
+      if (onProgress) onProgress('ローカルデータと統合マージ中...');
+
+      // 2. Fetch local data
+      const localBooks = await this.db.getAllBooks();
+      const localMemos = await this.db.getAllMemos();
+
+      // Merge Books (Map by ID, newer updatedAt wins)
+      const mergedBooksMap = new Map();
+      (remoteData.books || []).forEach(b => mergedBooksMap.set(b.id, b));
+      localBooks.forEach(b => {
+        const rem = mergedBooksMap.get(b.id);
+        if (!rem || !rem.updatedAt || (b.updatedAt && new Date(b.updatedAt) >= new Date(rem.updatedAt))) {
+          mergedBooksMap.set(b.id, b);
+        }
+      });
+
+      // Merge Memos (Map by ID, newer updatedAt wins)
+      const mergedMemosMap = new Map();
+      (remoteData.memos || []).forEach(m => mergedMemosMap.set(m.id, m));
+      localMemos.forEach(m => {
+        const rem = mergedMemosMap.get(m.id);
+        if (!rem || !rem.updatedAt || (m.updatedAt && new Date(m.updatedAt) >= new Date(rem.updatedAt))) {
+          mergedMemosMap.set(m.id, m);
+        }
+      });
+
+      const finalBooks = Array.from(mergedBooksMap.values());
+      const finalMemos = Array.from(mergedMemosMap.values());
+      const nowIso = new Date().toISOString();
+
+      const payload = {
+        lastSyncTime: nowIso,
+        books: finalBooks,
+        memos: finalMemos
+      };
+
+      if (onProgress) onProgress('Googleドライブへ同期保存中...');
+
+      // 3. Post merged payload to Google Drive (POST via plain text to avoid CORS preflight)
+      await fetch(this.syncUrl, {
+        method: 'POST',
+        redirect: 'follow',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      });
+
+      // 4. Update Local DB with merged records
+      for (const b of finalBooks) {
+        await this.db.saveBook(b);
+      }
+      for (const m of finalMemos) {
+        await this.db.saveMemo(m);
+      }
+
+      await this.db.saveSetting('gdrive_last_sync', nowIso);
+
+      return {
+        success: true,
+        lastSync: nowIso,
+        bookCount: finalBooks.length,
+        memoCount: finalMemos.length
+      };
+
+    } finally {
+      this.isSyncing = false;
+    }
+  }
+}
+
+// ==========================================================================
+// 5. Main Application Controller
 // ==========================================================================
 class AppController {
   constructor() {
     this.db = new BookNoteDB();
     this.gemini = new GeminiService();
+    this.syncHelper = new GoogleDriveSyncHelper(this.db);
     this.currentBook = null;
     this.currentSection = null;
     
@@ -634,6 +762,11 @@ class AppController {
     await this.initVoiceRecognition();
     await this.loadBooksAndSetCurrent();
     this.registerServiceWorker();
+
+    // Auto-sync on startup if configured
+    if (this.syncHelper.isConfigured() && this.syncHelper.autoSync) {
+      setTimeout(() => this.handleSyncNow(true), 1200);
+    }
   }
 
   cacheDomElements() {
@@ -752,6 +885,9 @@ class AppController {
       btnSaveBook: document.getElementById('btn-save-book'),
       btnDeleteBook: document.getElementById('btn-delete-book'),
 
+      // Header Sync Button
+      btnHeaderSync: document.getElementById('btn-header-sync'),
+
       // Settings Modal
       modalSettings: document.getElementById('modal-settings'),
       btnCloseSettingsModal: document.getElementById('btn-close-settings-modal'),
@@ -759,6 +895,11 @@ class AppController {
       btnToggleKeyVisibility: document.getElementById('btn-toggle-key-visibility'),
       btnPasteApiKey: document.getElementById('btn-paste-api-key'),
       selectGeminiModel: document.getElementById('select-gemini-model'),
+      inputGdriveSyncUrl: document.getElementById('input-gdrive-sync-url'),
+      syncStatusBadge: document.getElementById('sync-status-badge'),
+      btnSyncNow: document.getElementById('btn-sync-now'),
+      checkAutoSync: document.getElementById('check-auto-sync'),
+      syncLastTime: document.getElementById('sync-last-time'),
       btnSaveSettings: document.getElementById('btn-save-settings'),
       btnLoadSampleData: document.getElementById('btn-load-sample-data'),
       btnExportBackup: document.getElementById('btn-export-backup'),
@@ -771,6 +912,16 @@ class AppController {
   }
 
   setupEventListeners() {
+    // Header Sync Button
+    if (this.ui.btnHeaderSync) {
+      this.ui.btnHeaderSync.addEventListener('click', () => this.handleSyncNow(false));
+    }
+
+    // Modal Sync Button
+    if (this.ui.btnSyncNow) {
+      this.ui.btnSyncNow.addEventListener('click', () => this.handleSyncNow(false));
+    }
+
     // Navigation Tabs
     this.ui.navItems.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -1011,6 +1162,41 @@ class AppController {
 
     this.ui.inputGeminiKey.value = apiKey;
     this.ui.selectGeminiModel.value = model;
+
+    // Google Drive Sync settings
+    const syncUrl = await this.db.getSetting('gdrive_sync_url', '');
+    const autoSync = await this.db.getSetting('gdrive_auto_sync', true);
+    const lastSync = await this.db.getSetting('gdrive_last_sync', '');
+
+    this.syncHelper.setSyncUrl(syncUrl);
+    this.syncHelper.setAutoSync(autoSync);
+
+    if (this.ui.inputGdriveSyncUrl) this.ui.inputGdriveSyncUrl.value = syncUrl;
+    if (this.ui.checkAutoSync) this.ui.checkAutoSync.checked = autoSync;
+    this.updateSyncStatusUI(lastSync);
+  }
+
+  updateSyncStatusUI(lastSyncIso = '') {
+    const isConfigured = this.syncHelper.isConfigured();
+    if (this.ui.syncStatusBadge) {
+      if (isConfigured) {
+        this.ui.syncStatusBadge.textContent = '連携中';
+        this.ui.syncStatusBadge.className = 'sync-badge active';
+      } else {
+        this.ui.syncStatusBadge.textContent = '未設定';
+        this.ui.syncStatusBadge.className = 'sync-badge';
+      }
+    }
+
+    if (this.ui.syncLastTime) {
+      if (lastSyncIso) {
+        const d = new Date(lastSyncIso);
+        const timeStr = `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        this.ui.syncLastTime.textContent = `最終同期: ${timeStr}`;
+      } else {
+        this.ui.syncLastTime.textContent = isConfigured ? '最終同期: 未同期（ボタンを押して初回同期）' : '最終同期: 未同期';
+      }
+    }
   }
 
   openSettingsModal() {
@@ -1020,15 +1206,61 @@ class AppController {
   async handleSaveSettings() {
     const key = this.ui.inputGeminiKey.value.trim();
     const model = this.ui.selectGeminiModel.value;
+    const syncUrl = this.ui.inputGdriveSyncUrl ? this.ui.inputGdriveSyncUrl.value.trim() : '';
+    const autoSync = this.ui.checkAutoSync ? this.ui.checkAutoSync.checked : true;
 
     await this.db.saveSetting('gemini_api_key', key);
     await this.db.saveSetting('gemini_model', model);
+    await this.db.saveSetting('gdrive_sync_url', syncUrl);
+    await this.db.saveSetting('gdrive_auto_sync', autoSync);
 
     this.gemini.setApiKey(key);
     this.gemini.setModel(model);
+    this.syncHelper.setSyncUrl(syncUrl);
+    this.syncHelper.setAutoSync(autoSync);
+
+    const lastSync = await this.db.getSetting('gdrive_last_sync', '');
+    this.updateSyncStatusUI(lastSync);
 
     this.closeModal('modalSettings');
     this.showToast('設定を保存しました');
+
+    if (this.syncHelper.isConfigured() && autoSync) {
+      setTimeout(() => this.handleSyncNow(false), 500);
+    }
+  }
+
+  async handleSyncNow(isSilent = false) {
+    if (!this.syncHelper.isConfigured()) {
+      if (!isSilent) {
+        this.openSettingsModal();
+        this.showToast('⚙️ Googleドライブ同期URLを設定してください');
+      }
+      return;
+    }
+
+    if (this.ui.btnHeaderSync) this.ui.btnHeaderSync.classList.add('syncing');
+    if (this.ui.btnSyncNow) this.ui.btnSyncNow.disabled = true;
+
+    try {
+      if (!isSilent) this.showToast('☁️ Googleドライブと同期中...');
+      const result = await this.syncHelper.sync();
+      if (result && result.success) {
+        this.updateSyncStatusUI(result.lastSync);
+        await this.loadBooksAndSetCurrent();
+        if (!isSilent) {
+          this.showToast(`✅ Googleドライブと同期完了（書籍${result.bookCount}冊 / メモ${result.memoCount}件）`);
+        }
+      }
+    } catch (err) {
+      console.error('Google Drive Sync Error:', err);
+      if (!isSilent) {
+        alert('Googleドライブ同期エラー: ' + err.message);
+      }
+    } finally {
+      if (this.ui.btnHeaderSync) this.ui.btnHeaderSync.classList.remove('syncing');
+      if (this.ui.btnSyncNow) this.ui.btnSyncNow.disabled = false;
+    }
   }
 
   // ========================================================================
@@ -1373,6 +1605,10 @@ class AppController {
     const books = await this.db.getAllBooks();
     this.renderBookSelectDropdown(books);
     await this.selectBook(id);
+
+    if (this.syncHelper.isConfigured() && this.syncHelper.autoSync) {
+      this.syncHelper.sync().catch(e => console.warn('Auto sync book failed:', e));
+    }
   }
 
   async handleDeleteBook() {
@@ -1811,11 +2047,16 @@ class AppController {
     if (!this.parsedTOCData) return;
 
     this.currentBook.toc = this.parsedTOCData;
+    this.currentBook.updatedAt = new Date().toISOString();
     await this.db.saveBook(this.currentBook);
 
     this.closeModal('modalTOCImport');
     this.showToast('✅ 目次ツリーを適用・保存しました！');
     await this.refreshBookData();
+
+    if (this.syncHelper.isConfigured() && this.syncHelper.autoSync) {
+      this.syncHelper.sync().catch(e => console.warn('Auto sync TOC failed:', e));
+    }
   }
 
   fallbackParseTOCText(text) {
@@ -1945,7 +2186,8 @@ class AppController {
         insight: aiResult.insight || '',
         noteAngle: aiResult.noteAngle || '',
         starred: false,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       };
 
       await this.db.saveMemo(memo);
@@ -1953,6 +2195,10 @@ class AppController {
       this.showToast(useAI ? 'AI構造化メモを保存しました！' : 'メモを保存しました');
 
       await this.refreshBookData();
+
+      if (this.syncHelper.isConfigured() && this.syncHelper.autoSync) {
+        this.syncHelper.sync().catch(e => console.warn('Auto sync memo failed:', e));
+      }
 
     } catch (err) {
       console.error(err);

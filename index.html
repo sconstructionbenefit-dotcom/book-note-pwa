@@ -51,6 +51,11 @@
             <line x1="12" y1="19" x2="12" y2="22"></line>
           </svg>
         </button>
+        <button id="btn-header-sync" class="icon-btn sync-btn" title="Googleドライブと同期">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path>
+          </svg>
+        </button>
         <button id="btn-add-book" class="icon-btn" title="新しい書籍を追加">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -539,6 +544,34 @@
               <option value="gemini-3.6-pro">gemini-3.6-pro (高精度深層分析)</option>
               <option value="gemini-3.5-flash">gemini-3.5-flash (3.5世代・高速)</option>
             </select>
+          </div>
+
+          <div class="setting-divider"></div>
+
+          <!-- Google Drive Cloud Sync Section -->
+          <div class="form-group">
+            <div class="sync-header-row">
+              <label for="input-gdrive-sync-url">☁️ Googleドライブ同期（スマホ・PC共有）</label>
+              <span id="sync-status-badge" class="sync-badge">未設定</span>
+            </div>
+            <p class="field-hint">
+              Googleドライブ上に全データを安全に自動バックアップ・同期し、スマホとPCで書籍やメモを完全に共有できます。
+            </p>
+            <div class="sync-input-group mt-8">
+              <input type="url" id="input-gdrive-sync-url" class="form-input" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="sync-actions-row mt-8">
+              <button type="button" id="btn-sync-now" class="action-btn gradient-accent full-width">
+                🔄 今すぐGoogleドライブと同期する
+              </button>
+            </div>
+            <div class="sync-options-row mt-8">
+              <label class="checkbox-label">
+                <input type="checkbox" id="check-auto-sync" checked>
+                <span>メモ追加・編集時に自動クラウド同期する</span>
+              </label>
+            </div>
+            <p id="sync-last-time" class="field-hint mt-4">最終同期: 未同期</p>
           </div>
 
           <div class="setting-divider"></div>
